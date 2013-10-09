@@ -1,0 +1,43 @@
+<html>
+<head>
+<title>GazeServer sample client</title>
+<script src="http://code.jquery.com/jquery-latest.js"></script>
+<script type="text/javascript">
+function onReceived(e){
+	var data = JSON.parse(e.data);
+	if(data.LeftValidity < 2){
+		var x = parseFloat(data.LeftGazePoint2D.X) * screen.width;
+		var y =  parseFloat(data.LeftGazePoint2D.Y) * screen.height;
+		$("#left").css({ position:'absolute', left: x, top: y })
+	}
+	if(data.RightValidity < 2){
+		var x = parseFloat(data.RightGazePoint2D.X) * screen.width;
+		var y =  parseFloat(data.RightGazePoint2D.Y) * screen.height;
+		$("#right").css({ position:'absolute', left: x, top: y })
+	}
+}
+
+function list(s){
+	$("#list").append("<li>" + s + "</li>");
+}
+
+function connect(){
+	var ws = new WebSocket("ws://localhost:10811/ws/");
+	ws.onmessage = onReceived;
+	ws.onopen = function(){ list("onopen"); };
+	ws.onerror = function(){ list("onerror"); };
+	ws.onclose = function(){ list("onclose"); };
+}
+
+$(document).ready(function(){ $("#connectButton").bind("click", connect); });
+</script>
+</head>
+<body>
+<h1>GazeServer sample client</h1>
+<input id="connectButton" type="button" value="connect" />
+<p id="point"></p>
+<ul id="list"></ul>
+<span id="left">L</span>
+<span id="right">R</span>
+</body>
+</html>
