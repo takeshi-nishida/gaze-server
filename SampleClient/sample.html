@@ -3,17 +3,27 @@
 <title>GazeServer sample client</title>
 <script src="http://code.jquery.com/jquery-latest.js"></script>
 <script type="text/javascript">
+var dx, dy;
+
 function onReceived(e){
 	var data = JSON.parse(e.data);
 	if(data.LeftValidity < 2){
-		var x = parseFloat(data.LeftGazePoint2D.X) * screen.width;
-		var y =  parseFloat(data.LeftGazePoint2D.Y) * screen.height;
-		$("#left").css({ position:'absolute', left: x, top: y })
+		var x = parseFloat(data.LeftGazePoint2D.X) * screen.width - dx;
+		var y =  parseFloat(data.LeftGazePoint2D.Y) * screen.height - dy;
+		$("#left").offset({left: x, top: y});
+		$("#left").css({'background-color':'lightgreen' });
+	}
+	else{
+		$("#left").css({ 'background-color': 'red' });
 	}
 	if(data.RightValidity < 2){
-		var x = parseFloat(data.RightGazePoint2D.X) * screen.width;
-		var y =  parseFloat(data.RightGazePoint2D.Y) * screen.height;
-		$("#right").css({ position:'absolute', left: x, top: y })
+		var x = parseFloat(data.RightGazePoint2D.X) * screen.width - dx;
+		var y =  parseFloat(data.RightGazePoint2D.Y) * screen.height - dy;
+		$("#right").offset({ left: x, top: y });
+		$("#right").css({ 'background-color': 'lightgreen' });
+	}
+	else{
+		$("#right").css({ 'background-color': 'red' });
 	}
 }
 
@@ -21,7 +31,10 @@ function list(s){
 	$("#list").append("<li>" + s + "</li>");
 }
 
-function connect(){
+function connect(e){
+	dx = e.screenX - e.clientX;
+	dy = e.screenY - e.clientY;
+	$("#point").html(dx + "," + dy);
 	var ws = new WebSocket("ws://localhost:10811/ws/");
 	ws.onmessage = onReceived;
 	ws.onopen = function(){ list("onopen"); };

@@ -15,6 +15,8 @@ using System.Collections.Concurrent;
 using System.Threading.Tasks;
 using Tobii.EyeTracking.IO;
 using Newtonsoft.Json;
+using System.Diagnostics;
+using System.Runtime.InteropServices;
 
 namespace GazeServer
 {
@@ -25,13 +27,19 @@ namespace GazeServer
     {
         private ConcurrentBag<SuperWebSocket.WebSocketSession> sessions;
         private List<EyeTrackerInfo> eyeTrackers;
-        private XConfiguration xconfig;
+        private CalibrationRunner calibrationRunner;
+        private IEyeTracker tracker;
 
         public MainWindow()
         {
             InitializeComponent();
             InitializeEyeTracking();
             sessions = new ConcurrentBag<SuperWebSocket.WebSocketSession>();
+        }
+
+        private void Window_Unloaded(object sender, RoutedEventArgs e)
+        {
+            finishEmulation();
         }
 
         #region Server
@@ -69,19 +77,60 @@ namespace GazeServer
             browser.EyeTrackerFound += new EventHandler<EyeTrackerInfoEventArgs>(browser_EyeTrackerFound);
             browser.EyeTrackerRemoved += new EventHandler<EyeTrackerInfoEventArgs>(browser_EyeTrackerRemoved);
             browser.StartBrowsing();
+            calibrationRunner = new CalibrationRunner();
         }
 
-        private void startTrackingButton_Click(object sender, RoutedEventArgs e)
+        private void connectButton_Click(object sender, RoutedEventArgs e)
         {
             if (eyeTrackerSelect.SelectedItem != null)
             {
                 EyeTrackerInfo info = eyeTrackerSelect.SelectedItem as EyeTrackerInfo;
-                IEyeTracker tracker = info.Factory.CreateEyeTracker(EventThreadingOptions.BackgroundThread);
-                xconfig = tracker.GetXConfiguration();
+                tracker = info.Factory.CreateEyeTracker(EventThreadingOptions.BackgroundThread);
                 tracker.RealTimeGazeData = true;
                 tracker.GazeDataReceived += new EventHandler<GazeDataEventArgs>(tracker_GazeDataReceived);
-                tracker.StartTracking();
+                calibrateButton.IsEnabled = true;
+                startButton.IsEnabled = true;
             }
+        }
+
+        private void calibrateButton_Click(object sender, RoutedEventArgs e)
+        {
+            if (tracker != null)
+            {
+                try
+                {
+                    var result = calibrationRunner.RunCalibration(tracker);
+                    if (result != null)
+                    {
+                        // TODO: show results
+                    }
+                    else
+                    {
+                        MessageBox.Show("Failed to calibrate.", "Calibration Failed");
+                    }
+                }
+                catch (EyeTrackerException ee)
+                {
+                    MessageBox.Show("Failed to calibrate. Got exception " + ee, "Calibration Failed");
+                }
+            }
+        }
+
+        private void startButton_Click(object sender, RoutedEventArgs e)
+        {
+            if (tracker != null)
+            {
+                tracker.StartTracking();
+                calibrateButton.IsEnabled = false;
+                startEmulationButton.IsEnabled = false;
+            }
+        }
+
+        private void startEmulationButton_Click(object sender, RoutedEventArgs e)
+        {
+            startEmulation();
+            startButton.IsEnabled = false;
+            startEmulationButton.IsEnabled = false;
         }
 
         void browser_EyeTrackerFound(object sender, EyeTrackerInfoEventArgs e)
@@ -98,7 +147,7 @@ namespace GazeServer
         void tracker_GazeDataReceived(object sender, GazeDataEventArgs e)
         {
             Dispatcher.Invoke(new Action(() => updateTrackingStatus(e)));
-//            Point2D p = e.GazeDataItem.LeftGazePoint2D;
+            //            Point2D p = e.GazeDataItem.LeftGazePoint2D;
             broadcast(JsonConvert.SerializeObject(e.GazeDataItem));
         }
 
@@ -109,5 +158,48 @@ namespace GazeServer
         }
         #endregion
 
+        #region Mouse Hook
+        static MouseHookAPI.HookProcedureDelegate mouse_proc;
+
+        public IntPtr MouseHookProc(int nCode, IntPtr wParam, IntPtr lParam)
+        {
+            if (nCode >= 0)
+            {
+                MouseHookInfo.MouseHookStruct data = (MouseHookInfo.MouseHookStruct)Marshal.PtrToStructure(lParam, typeof(MouseHookInfo.MouseHookStruct));
+                switch ((int)wParam)
+                {
+                    case MouseHookInfo.WM_LBUTTONDOWN:
+                        {
+                            break;
+                        }
+                    case MouseHookInfo.WM_LBUTTONUP:
+                        {
+                            break;
+                        }
+                }
+            }
+            return MouseHookAPI.CallNextHookEx(MouseHookInfo.hHook, nCode, wParam, lParam);
+        }
+
+        void startEmulation()
+        {
+            using (Process process = Process.GetCurrentProcess())
+            using (ProcessModule module = process.MainModule)
+            {
+                MouseHookInfo.hHook = MouseHookAPI.SetWindowsHookEx(
+                MouseHookInfo.WH_MOUSE_LL,
+                mouse_proc = new MouseHookAPI.HookProcedureDelegate(MouseHookProc),
+                MouseHookAPI.GetModuleHandle(module.ModuleName), 0);
+            }
+            if (MouseHookInfo.hHook == IntPtr.Zero)
+                MessageBox.Show("SetWindowsHookEx Failed.");
+        }
+
+        void finishEmulation()
+        {
+            if (MouseHookAPI.UnhookWindowsHookEx(MouseHookInfo.hHook) == false)
+                MessageBox.Show("UnhookWindowsHookEx Failed.");
+        }
+        #endregion
     }
 }
