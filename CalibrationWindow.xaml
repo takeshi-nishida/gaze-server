@@ -1,0 +1,8 @@
+﻿<Window x:Class="GazeServer.CalibrationWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" Height="300" Width="300" ResizeMode="NoResize" WindowState="Maximized" WindowStyle="None">
+    
+    <Canvas Name="c" Background="Black">
+        <Ellipse Width="44" Height="44" Fill="Yellow" Name="calibationPoint" HorizontalAlignment="Left" VerticalAlignment="Top" />
+    </Canvas>
+</Window>
