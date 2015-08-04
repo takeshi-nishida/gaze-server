@@ -25,6 +25,7 @@ namespace GazeServer
     /// </summary>
     public partial class MainWindow : Window
     {
+        private SuperWebSocket.WebSocketServer server;
         private ConcurrentBag<SuperWebSocket.WebSocketSession> sessions;
         private List<EyeTrackerInfo> eyeTrackers;
         private CalibrationRunner calibrationRunner;
@@ -40,6 +41,7 @@ namespace GazeServer
         private void Window_Unloaded(object sender, RoutedEventArgs e)
         {
             finishEmulation();
+            stopServer();
         }
 
         #region Server
@@ -48,10 +50,32 @@ namespace GazeServer
         {
             int port;
             if (!Int32.TryParse(portTextBox.Text, out port)) port = 10811;
-            SuperWebSocket.WebSocketServer server = new SuperWebSocket.WebSocketServer();
-            server.Setup(port);
+            server = new SuperWebSocket.WebSocketServer();
+//            server.Setup(port);
+            server.Setup(buildServerConfig(port));
             server.NewSessionConnected += new SuperSocket.SocketBase.SessionHandler<SuperWebSocket.WebSocketSession>(server_NewSessionConnected);
             server.Start();
+        }
+
+        private SuperSocket.SocketBase.Config.ServerConfig buildServerConfig(int port)
+        {
+            string pathToBaseDir = System.IO.Directory.GetParent(Environment.CurrentDirectory).Parent.FullName;
+            var cert = new SuperSocket.SocketBase.Config.CertificateConfig()
+            {
+                FilePath = "localhost.pfx", //System.IO.Path.Combine(pathToBaseDir, "localhost.pfx"),
+                Password = "localWS"
+            };
+            var config = new SuperSocket.SocketBase.Config.ServerConfig()
+            {
+                Port = port,
+                Ip = "Any",
+                MaxConnectionNumber = 100,
+                Mode = SuperSocket.SocketBase.SocketMode.Tcp,
+                Name = "GazeServer",
+                Security = "tls",
+                Certificate = cert
+            };
+            return config;
         }
 
         void server_NewSessionConnected(SuperWebSocket.WebSocketSession session)
@@ -62,6 +86,11 @@ namespace GazeServer
         private void broadcast(string data)
         {
             Parallel.ForEach(sessions, s => s.Send(data));
+        }
+
+        private void stopServer()
+        {
+            if(server != null) server.Stop();
         }
 
         #endregion

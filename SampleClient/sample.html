@@ -35,7 +35,7 @@ function connect(e){
 	dx = e.screenX - e.clientX;
 	dy = e.screenY - e.clientY;
 	$("#point").html(dx + "," + dy);
-	var ws = new WebSocket("ws://localhost:10811/ws/");
+	var ws = new WebSocket("wss://localhost:10811/ws/");
 	ws.onmessage = onReceived;
 	ws.onopen = function(){ list("onopen"); };
 	ws.onerror = function(){ list("onerror"); };
